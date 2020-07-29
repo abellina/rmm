@@ -20,6 +20,9 @@
 #include <rmm/detail/error.hpp>
 
 
+/**
+ * Lifted from: https://panthema.net/2008/0901-stacktrace-demangled/
+ */
 
 #include <stdio.h>
 #include <stdlib.h>

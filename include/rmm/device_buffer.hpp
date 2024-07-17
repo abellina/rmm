@@ -269,6 +269,7 @@ class device_buffer {
    */
   void reserve(std::size_t new_capacity, cuda_stream_view stream)
   {
+    RMM_FUNC_RANGE();
     set_stream(stream);
     if (new_capacity > capacity()) {
       cuda_set_device_raii dev{_device};
@@ -307,6 +308,7 @@ class device_buffer {
    */
   void resize(std::size_t new_size, cuda_stream_view stream)
   {
+    RMM_FUNC_RANGE();
     set_stream(stream);
     // If the requested size is smaller than the current capacity, just update
     // the size without any allocations
@@ -469,6 +471,7 @@ class device_buffer {
    */
   void copy_async(void const* source, std::size_t bytes)
   {
+    RMM_FUNC_RANGE();
     if (bytes > 0) {
       RMM_EXPECTS(nullptr != source, "Invalid copy from nullptr.");
       RMM_EXPECTS(nullptr != _data, "Invalid copy to nullptr.");

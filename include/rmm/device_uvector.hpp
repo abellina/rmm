@@ -214,6 +214,7 @@ class device_uvector {
                          value_type const& value,
                          cuda_stream_view stream)
   {
+    RMM_FUNC_RANGE();
     RMM_EXPECTS(
       element_index < size(), "Attempt to access out of bounds element.", rmm::out_of_range);
 
@@ -317,6 +318,7 @@ class device_uvector {
    */
   [[nodiscard]] value_type element(std::size_t element_index, cuda_stream_view stream) const
   {
+    RMM_FUNC_RANGE();
     RMM_EXPECTS(
       element_index < size(), "Attempt to access out of bounds element.", rmm::out_of_range);
     value_type value;

@@ -36,8 +36,9 @@ namespace rmm {
  * `T` must be trivially copyable.
  *
  * @tparam T The object's type
+ * @tparam DeviceCopyPolicy An interface 
  */
-template <typename T>
+template <typename T, typename Storage = rmm::device_uvector<T>>
 class device_scalar {
  public:
   static_assert(std::is_trivially_copyable<T>::value, "Scalar type must be trivially copyable");
@@ -273,7 +274,7 @@ class device_scalar {
   void set_stream(cuda_stream_view stream) noexcept { _storage.set_stream(stream); }
 
  private:
-  rmm::device_uvector<T> _storage;
+  Storage _storage;
 };
 
 /** @} */  // end of group

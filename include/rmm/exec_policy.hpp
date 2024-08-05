@@ -100,11 +100,18 @@ using exec_policy_nosync =
 /** @} */  // end of group
 }  // namespace rmm
 
+namespace cudf {
+
+}
+
 namespace thrust::cuda_cub {
-template <typename Pointer>
-inline _CCCL_HOST_DEVICE typename thrust::iterator_value<Pointer>::type
+
+template <typename Pointer>  
+_CCCL_HOST_DEVICE typename thrust::iterator_value<Pointer>::type
 get_value<rmm::exec_policy>(execution_policy<rmm::exec_policy>& exec, Pointer ptr)
 {
+
+  typedef typename thrust::iterator_value<Pointer>::type result_type;
      _CCCL_HOST inline static result_type host_path(execution_policy<DerivedPolicy>& exec, Pointer ptr)
     {
       // when called from host code, implement with assign_value

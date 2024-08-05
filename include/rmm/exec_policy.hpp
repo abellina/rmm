@@ -28,6 +28,7 @@
 
 #include <thrust/system/cuda/execution_policy.h>
 #include <thrust/version.h>
+#include <thrust/system/cuda/detail/get_value.h>
 
 namespace rmm {
 /**
@@ -98,3 +99,30 @@ using exec_policy_nosync =
 
 /** @} */  // end of group
 }  // namespace rmm
+
+namespace thrust::cuda_cub {
+template <typename Pointer>
+inline _CCCL_HOST_DEVICE typename thrust::iterator_value<Pointer>::type
+get_value<rmm::exec_policy>(execution_policy<rmm::exec_policy>& exec, Pointer ptr)
+{
+     _CCCL_HOST inline static result_type host_path(execution_policy<DerivedPolicy>& exec, Pointer ptr)
+    {
+      // when called from host code, implement with assign_value
+      // note that this requires a type with default constructor
+      result_type result;
+
+      thrust::host_system_tag host_tag;
+      cross_system<thrust::host_system_tag, DerivedPolicy> systems(host_tag, exec);
+      assign_value(systems, &result, ptr);
+
+      return result;
+    }
+
+    _CCCL_DEVICE inline static result_type device_path(execution_policy<DerivedPolicy>&, Pointer ptr)
+    {
+      // when called from device code, just do simple deref
+      return *thrust::raw_pointer_cast(ptr);
+    }
+} // end get_value()
+}
+

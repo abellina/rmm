@@ -111,6 +111,7 @@ class device_buffer {
                          device_async_resource_ref mr = mr::get_current_device_resource())
     : _stream{stream}, _mr{mr}
   {
+    RMM_FUNC_RANGE();
     cuda_set_device_raii dev{_device};
     allocate_async(size);
   }
@@ -140,6 +141,7 @@ class device_buffer {
                 device_async_resource_ref mr = mr::get_current_device_resource())
     : _stream{stream}, _mr{mr}
   {
+    RMM_FUNC_RANGE();
     cuda_set_device_raii dev{_device};
     allocate_async(size);
     copy_async(source_data, size);

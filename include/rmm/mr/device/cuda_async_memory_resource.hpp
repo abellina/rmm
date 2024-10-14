@@ -66,7 +66,8 @@ class cuda_async_memory_resource final : public device_memory_resource {
     posix_file_descriptor = 0x1,  ///< Allows a file descriptor to be used for exporting. Permitted
                                   ///< only on POSIX systems.
     win32     = 0x2,              ///< Allows a Win32 NT handle to be used for exporting. (HANDLE)
-    win32_kmt = 0x4  ///< Allows a Win32 KMT handle to be used for exporting. (D3DKMT_HANDLE)
+    win32_kmt = 0x4,              ///< Allows a Win32 KMT handle to be used for exporting. (D3DKMT_HANDLE)
+    fabric    = 0x8               ///< Allows a fabric handle to be used for exporting (cudaMemFabricHandle_t)
   };
 
   /**

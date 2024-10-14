@@ -60,7 +60,14 @@ class cuda_async_memory_resource final : public device_memory_resource {
     posix_file_descriptor = 0x1,  ///< Allows a file descriptor to be used for exporting. Permitted
                                   ///< only on POSIX systems.
     win32     = 0x2,              ///< Allows a Win32 NT handle to be used for exporting. (HANDLE)
-    win32_kmt = 0x4  ///< Allows a Win32 KMT handle to be used for exporting. (D3DKMT_HANDLE)
+    win32_kmt = 0x4,              ///< Allows a Win32 KMT handle to be used for exporting. (D3DKMT_HANDLE)
+    fabric    = 0x8               ///< Allows a fabric handle to be used for exporting. (cudaMemFabricHandle_t)
+  };
+
+  enum class access_flags {
+    prot_none       = 0x0, ///< Default, make the address range not accessible. (cudaMemAccessFlagsProtNone)
+    prot_read       = 0x1, ///< Make the address range read accessible. (cudaMemAccessFlagsProtRead)
+    prot_read_write = 0x2  ///< Make the address range read-write accessible. (cudaMemAccessFlagsProtReadWrite)
   };
 
   /**
@@ -77,13 +84,16 @@ class cuda_async_memory_resource final : public device_memory_resource {
    * @param release_threshold Optional release threshold size in bytes of the pool. If no value is
    * provided, the release threshold is set to the total amount of memory on the current device.
    * @param export_handle_type Optional `cudaMemAllocationHandleType` that allocations from this
-   * resource should support interprocess communication (IPC). Default is
-   * `cudaMemHandleTypeNone` for no IPC support.
+   * resource should support interprocess communication (IPC). Default is `cudaMemHandleTypeNone` 
+   * for no IPC support.
+   * @param access_flag Optional `cudaMemAccessFlags` that controls pool memory accessibility
+   * from other devices. Default is `cudaMemAccessFlagsProtNone` for no accessibility.
    */
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   cuda_async_memory_resource(std::optional<std::size_t> initial_pool_size             = {},
                              std::optional<std::size_t> release_threshold             = {},
-                             std::optional<allocation_handle_type> export_handle_type = {})
+                             std::optional<allocation_handle_type> export_handle_type = {},
+                             std::optional<access_flags> access_flag                  = {})
   {
     // Check if cudaMallocAsync Memory pool supported
     RMM_EXPECTS(rmm::detail::runtime_async_alloc::is_supported(),
@@ -113,6 +123,13 @@ class cuda_async_memory_resource final : public device_memory_resource {
       int disabled{0};
       RMM_CUDA_TRY(
         cudaMemPoolSetAttribute(pool_handle(), cudaMemPoolReuseAllowOpportunistic, &disabled));
+    }
+
+    if (access_flag) {
+      cudaMemAccessDesc desc;
+      desc.location = pool_props.location;
+      desc.flags = static_cast<cudaMemAccessFlags>(access_flag.value_or(access_flags::prot_none));
+      RMM_CUDA_TRY(cudaMemPoolSetAccess(pool_handle(), &desc, 1));
     }
 
     auto const [free, total] = rmm::available_device_memory();

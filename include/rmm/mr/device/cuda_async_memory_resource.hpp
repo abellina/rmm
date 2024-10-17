@@ -122,6 +122,11 @@ class cuda_async_memory_resource final : public device_memory_resource {
         pool_handle(), cudaMemPoolReuseAllowOpportunistic, &disabled));
     }
 
+    cudaMemAccessDesc desc;
+    desc.location = pool_props.location;
+    desc.flags = cudaMemAccessFlagsProtReadWrite;
+    RMM_CUDA_TRY(cudaMemPoolSetAccess(pool_handle(), &desc, 1));
+
     auto const [free, total] = rmm::available_device_memory();
 
     // Need an l-value to take address to pass to cudaMemPoolSetAttribute

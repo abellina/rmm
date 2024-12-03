@@ -67,7 +67,7 @@ class cuda_async_memory_resource final : public device_memory_resource {
   enum class access_flags {
     prot_none       = 0x0, ///< Default, make the address range not accessible. (cudaMemAccessFlagsProtNone)
     prot_read       = 0x1, ///< Make the address range read accessible. (cudaMemAccessFlagsProtRead)
-    prot_read_write = 0x2  ///< Make the address range read-write accessible. (cudaMemAccessFlagsProtReadWrite)
+    prot_read_write = 0x3  ///< Make the address range read-write accessible. (cudaMemAccessFlagsProtReadWrite)
   };
 
   /**

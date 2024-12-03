@@ -129,7 +129,7 @@ class cuda_async_memory_resource final : public device_memory_resource {
       cudaMemAccessDesc desc;
       desc.location = pool_props.location;
       desc.flags = static_cast<cudaMemAccessFlags>(access_flag.value_or(access_flags::prot_none));
-      println("set access to %i\n", desc.flags);
+      printf("set access to %i\n", desc.flags);
       RMM_CUDA_TRY(cudaMemPoolSetAccess(pool_handle(), &desc, 1));
     }
 

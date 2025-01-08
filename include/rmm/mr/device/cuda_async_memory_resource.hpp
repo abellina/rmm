@@ -115,7 +115,7 @@ class cuda_async_memory_resource final : public device_memory_resource {
     } else {
       int cpu_numa_node_id;
       auto gpu_id   = rmm::get_current_cuda_device().value();
-      RMM_CUDA_TRY(cudaDeviceGetAttribute(&cpu_numa_node_id, cudaDevAttrNumaId, gpu_id); 
+      RMM_CUDA_TRY(cudaDeviceGetAttribute(&cpu_numa_node_id, cudaDevAttrNumaId, gpu_id)); 
       pool_props.location.id = cpu_numa_node_id;
     }
 

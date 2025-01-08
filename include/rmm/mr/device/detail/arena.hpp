@@ -683,6 +683,10 @@ class global_arena final {
     }
   }
 
+  std::pair<void*, std::size_t> get_upstream_allocation() {
+    return std::pair(upstream_block_.pointer(), upstream_block_.size());
+  }
+
  private:
   /**
    * @brief Default size of the global arena if unspecified.

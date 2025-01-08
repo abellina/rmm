@@ -100,7 +100,7 @@ class cuda_async_memory_resource final : public device_memory_resource {
     RMM_EXPECTS(rmm::detail::runtime_async_alloc::is_supported(),
                 "cudaMallocAsync not supported with this CUDA driver/runtime version");
 
-    auto is_gpu = (location_type.value_or(mem_location_type::device)) == cudaMemLocationTypeDevice;
+    auto is_gpu = (location_type.value_or(mem_location_type::device)) == mem_location_type::device;
     // Construct explicit pool
     cudaMemPoolProps pool_props{};
     pool_props.allocType   = cudaMemAllocationTypePinned;

@@ -154,7 +154,7 @@ class arena_memory_resource final : public device_memory_resource {
     auto& arena = get_arena(stream);
 
     {
-      std::shared_lock lock(mtx_);
+      //std::shared_lock lock(mtx_);
       void* pointer = arena.allocate(bytes);
       if (pointer != nullptr) { return pointer; }
     }
@@ -204,7 +204,7 @@ class arena_memory_resource final : public device_memory_resource {
     auto& arena = get_arena(stream);
 
     {
-      std::shared_lock lock(mtx_);
+      //std::shared_lock lock(mtx_);
       // If the memory being freed does not belong to the arena, the following will return false.
       if (arena.deallocate(ptr, bytes, stream)) { return; }
     }

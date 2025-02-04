@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <nvtx3/nvtx3.hpp>
 #include <rmm/aligned.hpp>
 #include <rmm/cuda_device.hpp>
 #include <rmm/cuda_stream_view.hpp>
@@ -926,19 +925,17 @@ class arena {
    */
   block first_fit(std::size_t size)
   {
-    nvtxRangePush("block::first_fit");
+    rmm::scoped_range rng{"block::first_fit"};
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [size](auto const& sblk) { return sblk.fits(size); });
     if (iter == superblocks_.cend()) { 
-      nvtxRangePop();
       return {}; 
     }
 
     auto sblk      = std::move(superblocks_.extract(iter).value());
     auto const blk = sblk.first_fit(size);
     superblocks_.insert(std::move(sblk));
-    nvtxRangePop();
     return blk;
   }
 

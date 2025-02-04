@@ -36,7 +36,8 @@
 #include <numeric>
 #include <optional>
 #include <set>
-#include <nvtx/ranges.hpp>
+#include <rmm/detail/nvtx/ranges.hpp>
+
 
 namespace RMM_NAMESPACE {
 namespace mr::detail::arena {

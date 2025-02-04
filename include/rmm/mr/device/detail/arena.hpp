@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <nvtx3.hpp>
 #include <rmm/aligned.hpp>
 #include <rmm/cuda_device.hpp>
 #include <rmm/cuda_stream_view.hpp>
@@ -36,6 +37,7 @@
 #include <numeric>
 #include <optional>
 #include <set>
+#include <nvtx/ranges.hpp>
 
 namespace RMM_NAMESPACE {
 namespace mr::detail::arena {
@@ -249,6 +251,12 @@ inline bool block_size_compare(block const& lhs, block const& rhs)
   return lhs.size() < rhs.size();
 }
 
+struct size_comparator {
+  bool operator()(block const& lhs, block const& rhs) {
+    return lhs.size() > rhs.size();
+  }
+};
+
 /**
  * @brief Represents a large chunk of memory that is exchanged between the global arena and
  * per-thread arenas.
@@ -276,6 +284,7 @@ class superblock final : public byte_span {
     RMM_LOGGING_ASSERT(size >= minimum_size);
     RMM_LOGGING_ASSERT(size <= maximum_size);
     free_blocks_.emplace(pointer, size);
+    //free_blocks_by_size_.emplace(pointer, size);
   }
 
   // Disable copy semantics.
@@ -331,7 +340,9 @@ class superblock final : public byte_span {
    */
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
+    NVTX3_FUNC_RANGE_IN(rmm::librmm_domain)
     RMM_LOGGING_ASSERT(is_valid());
+    //return (free_blocks_by_size_.cbegin())->fits(bytes);
     return std::any_of(free_blocks_.cbegin(), free_blocks_.cend(), [bytes](auto const& blk) {
       return blk.fits(bytes);
     });
@@ -388,6 +399,7 @@ class superblock final : public byte_span {
    */
   block first_fit(std::size_t size)
   {
+    NVTX3_FUNC_RANGE_IN(rmm::librmm_domain)
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(size > 0);
 
@@ -415,6 +427,7 @@ class superblock final : public byte_span {
    */
   void coalesce(block const& blk)  // NOLINT(readability-function-cognitive-complexity)
   {
+    NVTX3_FUNC_RANGE_IN(rmm::librmm_domain)
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(blk.is_valid());
     RMM_LOGGING_ASSERT(contains(blk));
@@ -464,6 +477,7 @@ class superblock final : public byte_span {
  private:
   /// Address-ordered set of free blocks.
   std::set<block> free_blocks_{};
+  //std::set<block, size_comparator> free_blocks_by_size_;
 };
 
 /// Calculate the total free size of a set of superblocks.
@@ -912,14 +926,19 @@ class arena {
    */
   block first_fit(std::size_t size)
   {
+    nvtxRangePush("block::first_fit");
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [size](auto const& sblk) { return sblk.fits(size); });
-    if (iter == superblocks_.cend()) { return {}; }
+    if (iter == superblocks_.cend()) { 
+      nvtxRangePop();
+      return {}; 
+    }
 
     auto sblk      = std::move(superblocks_.extract(iter).value());
     auto const blk = sblk.first_fit(size);
     superblocks_.insert(std::move(sblk));
+    nvtxRangePop();
     return blk;
   }
 

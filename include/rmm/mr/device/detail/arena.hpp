@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <nvtx3.hpp>
+#include <nvtx3/nvtx3.hpp>
 #include <rmm/aligned.hpp>
 #include <rmm/cuda_device.hpp>
 #include <rmm/cuda_stream_view.hpp>

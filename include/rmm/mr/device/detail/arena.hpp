@@ -340,7 +340,6 @@ class superblock final : public byte_span {
    */
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
-    NVTX3_FUNC_RANGE_IN(rmm::librmm_domain)
     RMM_LOGGING_ASSERT(is_valid());
     //return (free_blocks_by_size_.cbegin())->fits(bytes);
     return std::any_of(free_blocks_.cbegin(), free_blocks_.cend(), [bytes](auto const& blk) {
@@ -739,6 +738,7 @@ class global_arena final {
    */
   superblock first_fit(std::size_t size)
   {
+    rmm::scoped_range rng{"superblock first_fit"};
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [=](auto const& sblk) { return sblk.fits(size); });
@@ -926,7 +926,6 @@ class arena {
    */
   block first_fit(std::size_t size)
   {
-    rmm::scoped_range rng{"block::first_fit"};
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [size](auto const& sblk) { return sblk.fits(size); });

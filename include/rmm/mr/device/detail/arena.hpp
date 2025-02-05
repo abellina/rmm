@@ -342,7 +342,7 @@ class superblock final : public byte_span {
   {
     RMM_LOGGING_ASSERT(is_valid());
     //return (free_blocks_by_size_.cbegin())->fits(bytes);
-    return std::any_of(free_blocks_.cbegin(), free_blocks_.cend(), [bytes](auto const& blk) {
+    return size() >= bytes && std::any_of(free_blocks_.cbegin(), free_blocks_.cend(), [bytes](auto const& blk) {
       return blk.fits(bytes);
     });
   }

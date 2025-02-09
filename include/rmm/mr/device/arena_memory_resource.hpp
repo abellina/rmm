@@ -145,6 +145,7 @@ class arena_memory_resource final : public device_memory_resource {
    */
   void* do_allocate(std::size_t bytes, cuda_stream_view stream) override
   {
+    rmm::scoped_range rng{"a:do_allocate"};
     if (bytes <= 0) { return nullptr; }
 #ifdef RMM_ARENA_USE_SIZE_CLASSES
     bytes = rmm::mr::detail::arena::align_to_size_class(bytes);
@@ -195,6 +196,7 @@ class arena_memory_resource final : public device_memory_resource {
    */
   void do_deallocate(void* ptr, std::size_t bytes, cuda_stream_view stream) override
   {
+    rmm::scoped_range rng{"a:do_deallocate"};
     if (ptr == nullptr || bytes <= 0) { return; }
 #ifdef RMM_ARENA_USE_SIZE_CLASSES
     bytes = rmm::mr::detail::arena::align_to_size_class(bytes);

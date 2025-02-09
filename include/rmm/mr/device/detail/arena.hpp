@@ -263,8 +263,8 @@ struct size_comparator {
  */
 class superblock final : public byte_span {
  public:
-  /// Minimum size of a superblock (16 MiB).
-  static constexpr std::size_t minimum_size{16UL << 20};
+  /// Minimum size of a superblock (1 MiB).
+  static constexpr std::size_t minimum_size{1UL << 20};
   /// Maximum size of a superblock (1 TiB), as a sanity check.
   static constexpr std::size_t maximum_size{1UL << 40};
 

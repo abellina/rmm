@@ -263,8 +263,8 @@ struct size_comparator {
  */
 class superblock final : public byte_span {
  public:
-  /// Minimum size of a superblock (1 MiB).
-  static constexpr std::size_t minimum_size{1UL << 20};
+  /// Minimum size of a superblock (16 MiB).
+  static constexpr std::size_t minimum_size{16UL << 20};
   /// Maximum size of a superblock (1 TiB), as a sanity check.
   static constexpr std::size_t maximum_size{1UL << 40};
 
@@ -284,7 +284,6 @@ class superblock final : public byte_span {
     RMM_LOGGING_ASSERT(size >= minimum_size);
     RMM_LOGGING_ASSERT(size <= maximum_size);
     free_blocks_.emplace(pointer, size);
-    //free_blocks_by_size_.emplace(pointer, size);
   }
 
   // Disable copy semantics.
@@ -341,7 +340,6 @@ class superblock final : public byte_span {
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
     RMM_LOGGING_ASSERT(is_valid());
-    //return (free_blocks_by_size_.cbegin())->fits(bytes);
     return size() >= bytes && std::any_of(free_blocks_.cbegin(), free_blocks_.cend(), [bytes](auto const& blk) {
       return blk.fits(bytes);
     });
@@ -476,7 +474,6 @@ class superblock final : public byte_span {
  private:
   /// Address-ordered set of free blocks.
   std::set<block> free_blocks_{};
-  //std::set<block, size_comparator> free_blocks_by_size_;
 };
 
 /// Calculate the total free size of a set of superblocks.

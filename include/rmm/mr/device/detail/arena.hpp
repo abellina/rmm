@@ -406,7 +406,7 @@ class superblock final : public byte_span {
     auto fits       = [size](auto const& blk) { return blk.fits(size); };
     if (free_blocks_by_size_.rbegin() != free_blocks_by_size_.rend()) {
       if (!free_blocks_by_size_.rbegin()->fits(size)) {
-        return false;
+        return {};
       }
     }
     // else, expensive by address search

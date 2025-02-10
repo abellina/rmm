@@ -486,6 +486,7 @@ class pool_memory_resource final
     return {largest, total};
   }
 
+ public: 
   std::pair<void*, std::size_t> get_upstream_allocation() {
     return {root_pointer_, pool_size};
   }

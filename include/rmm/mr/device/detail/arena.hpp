@@ -669,7 +669,7 @@ class global_arena final {
     block const blk{ptr, bytes};
     auto test_sb = superblock(ptr, 0);
     auto first_addr = superblocks_.lower_bound(test_sb);
-    auto const iter = std::find_if(first_addr.cbegin(),
+    auto const iter = std::find_if(first_addr,
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
     if (iter == superblocks_.cend()) { return false; }

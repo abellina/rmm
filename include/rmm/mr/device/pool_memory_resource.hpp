@@ -295,6 +295,8 @@ class pool_memory_resource final
 
     if (initial_size > 0) {
       auto const block = try_to_expand(initial_size, initial_size, cuda_stream_legacy);
+      root_pointer_ = reinterpret_cast<void*>(block.pointer());
+      pool_size_ = initial_size;
       this->insert_block(block, cuda_stream_legacy);
     }
   }
@@ -484,8 +486,15 @@ class pool_memory_resource final
     return {largest, total};
   }
 
+  std::pair<void*, std::size_t> get_upstream_allocation() {
+    return {root_pointer_, pool_size};
+  }
+
  private:
   // The "heap" to allocate the pool from
+  void *  root_pointer_;
+  std::size_t pool_size_;
+
   device_async_resource_ref upstream_mr_;
   std::size_t current_pool_size_{};
   std::optional<std::size_t> maximum_pool_size_{};

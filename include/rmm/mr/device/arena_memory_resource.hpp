@@ -155,14 +155,17 @@ class arena_memory_resource final : public device_memory_resource {
     auto& arena = get_arena(stream);
 
     {
+    rmm::scoped_range rng{"a:do_allocate:step1"};
       //std::shared_lock lock(mtx_);
       void* pointer = arena.allocate(bytes);
       if (pointer != nullptr) { return pointer; }
     }
 
     {
+    rmm::scoped_range rng{"a:do_allocate:step2:defrag"};
       std::unique_lock lock(mtx_);
       defragment();
+    rmm::scoped_range rng{"a:do_allocate:step2:alloc"};
       void* pointer = arena.allocate(bytes);
       if (pointer == nullptr) {
         if (dump_log_on_failure_) { dump_memory_log(bytes); }

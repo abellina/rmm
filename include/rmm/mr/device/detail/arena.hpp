@@ -667,8 +667,8 @@ class global_arena final {
     std::lock_guard lock(mtx_);
 
     block const blk{ptr, bytes};
-    auto first_addr = superblocks_.lower_bound(blk);
-    auto const iter = std::find_if(first_addr.cbegin(),
+    //auto first_addr = superblocks_.lower_bound(blk);
+    auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
     if (iter == superblocks_.cend()) { return false; }

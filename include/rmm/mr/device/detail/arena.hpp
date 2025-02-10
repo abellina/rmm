@@ -671,17 +671,22 @@ class global_arena final {
     if (superblocks_.empty()) {
       return false;
     }
+    rmm::scoped_range rng3{"global_arena::deallocate::block_construct"};
     block const blk{ptr, bytes};
+    rmm::scoped_range rng4{"global_arena::deallocate::superblock_construct"};
     auto test_sb = superblock(ptr, 0);
+    rmm::scoped_range rng5{"global_arena::deallocate::upper_bound"};
     auto first_addr = superblocks_.upper_bound(test_sb);
     if (first_addr != superblocks_.cbegin()) {
       first_addr--;
     }
+    rmm::scoped_range rng6{"global_arena::deallocate::find_if"};
     auto const iter = std::find_if(first_addr,
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
     if (iter == superblocks_.cend()) { return false; }
 
+    rmm::scoped_range rng7{"global_arena::deallocate::extract"};
     auto sblk = std::move(superblocks_.extract(iter).value());
     sblk.coalesce(blk);
     if (sblk.empty()) {

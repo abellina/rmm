@@ -283,8 +283,9 @@ class superblock final : public byte_span {
   {
     RMM_LOGGING_ASSERT(size >= minimum_size);
     RMM_LOGGING_ASSERT(size <= maximum_size);
-    free_blocks_.emplace(pointer, size);
-    free_blocks_by_size_.emplace(size);
+    block b{pointer ,size};
+    free_blocks_.insert(b);
+    free_blocks_by_size_.insert(b);
   }
 
   // Disable copy semantics.
@@ -655,7 +656,7 @@ class global_arena final {
     std::lock_guard lock(mtx_);
 
     block const blk{ptr, bytes};
-    auto first_addr = superblocks_.lower_bound(block);
+    auto first_addr = superblocks_.lower_bound(blk);
     auto const iter = std::find_if(first_addr.cbegin(),
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });

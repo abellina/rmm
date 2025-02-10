@@ -525,6 +525,13 @@ inline auto max_free_size(std::set<superblock> const& superblocks)
   return size;
 };
 
+struct superblocks_by_size {
+  bool operator()(superblock const& lhs, superblock const& rhs) const
+  {
+    return lhs.size() < rhs.size();
+  }
+};
+
 /**
  * @brief The global arena for allocating memory from the upstream memory resource.
  *
@@ -789,6 +796,8 @@ class global_arena final {
     if (iter == superblocks_.cend()) { return {}; }
 
     auto sblk           = std::move(superblocks_.extract(iter).value());
+    rmm::scoped_range rng2{"global_arena::first_fit::got sblk"};
+
     auto const min_size = std::max(superblock::minimum_size, size);
     if (sblk.empty() && sblk.size() >= min_size + superblock::minimum_size) {
       // Split the superblock and put the remainder back.

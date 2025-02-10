@@ -449,6 +449,7 @@ class superblock final : public byte_span {
    */
   void coalesce(block const& blk)  // NOLINT(readability-function-cognitive-complexity)
   {
+    printf("at superblock::coalesce\n");
     NVTX3_FUNC_RANGE_IN(rmm::librmm_domain)
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(blk.is_valid());
@@ -479,17 +480,19 @@ class superblock final : public byte_span {
       free_blocks_.insert(iter, merged);
       free_blocks_by_size_.insert(merged);
     } else if (merge_next) {
+      printf("merge_next\n");
       auto const merged = blk.merge(*next);
       free_blocks_by_size_.erase(*next);
       auto const iter   = free_blocks_.erase(next);
 
       free_blocks_.insert(iter, merged);
-      free_blocks_by_size_.insert(iter, merged);
+      free_blocks_by_size_.insert(merged);
     } else {
 
       free_blocks_.insert(next, blk);
       free_blocks_by_size_.insert(blk);
     }
+    printf("done with superblock::coalesce\n");
   }
 
   /**

@@ -647,7 +647,6 @@ class global_arena final {
    */
   bool deallocate_async(void* ptr, std::size_t size, cuda_stream_view stream)
   {
-    rmm::scoped_range rng{"global_arena::dealocate_async"};
     RMM_LOGGING_ASSERT(handles(size));
     stream.synchronize_no_throw();
     return deallocate(ptr, size);
@@ -663,7 +662,6 @@ class global_arena final {
    */
   bool deallocate(void* ptr, std::size_t bytes)
   {
-    rmm::scoped_range rng{"global_arena::deallocate"};
     std::lock_guard lock(mtx_);
     if (superblocks_.empty()) {
       return false;
@@ -774,7 +772,6 @@ class global_arena final {
    */
   superblock first_fit(std::size_t size)
   {
-    rmm::scoped_range rng{"global_arena::first_fit"};
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [=](auto const& sblk) { return sblk.fits(size); });
@@ -962,7 +959,6 @@ class arena {
    */
   block first_fit(std::size_t size)
   {
-    rmm::scoped_range rng{"arena first_fit"};
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [size](auto const& sblk) { return sblk.fits(size); });

@@ -404,6 +404,12 @@ class superblock final : public byte_span {
     RMM_LOGGING_ASSERT(size > 0);
 
     auto fits       = [size](auto const& blk) { return blk.fits(size); };
+    if (free_blocks_by_size_.rbegin() != free_blocks_by_size_.rend()) {
+      if (!free_blocks_by_size_.rbegin()->fits(size)) {
+        return false;
+      }
+    }
+    // else, expensive by address search
     auto const iter = std::find_if(free_blocks_.cbegin(), free_blocks_.cend(), fits);
     if (iter == free_blocks_.cend()) { return {}; }
 

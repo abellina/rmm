@@ -370,7 +370,7 @@ class superblock final : public byte_span {
   {
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(empty() && bytes >= minimum_size && size() >= bytes + minimum_size);
-    println("at superblock split"); 
+    printf("at superblock split"); 
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     return {superblock{pointer(), bytes}, superblock{pointer() + bytes, size() - bytes}};
   }
@@ -617,15 +617,15 @@ class global_arena final {
    */
   void* allocate(std::size_t size)
   {
-    println("at global_arena::allocate");
+    printf("at global_arena::allocate");
     RMM_LOGGING_ASSERT(handles(size));
     std::lock_guard lock(mtx_);
-    println("at global_arena::allocate calling first_fit");
+    printf("at global_arena::allocate calling first_fit");
     auto sblk = first_fit(size);
     if (sblk.is_valid()) {
-      println("at global_arena::allocate calling sblk.first_fit");
+      printf("at global_arena::allocate calling sblk.first_fit");
       auto blk = sblk.first_fit(size);
-      println("at global_arena::allocate inserting sblk");
+      printf("at global_arena::allocate inserting sblk");
       superblocks_.insert(std::move(sblk));
       return blk.pointer();
     }

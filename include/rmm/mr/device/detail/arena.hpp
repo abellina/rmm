@@ -222,6 +222,7 @@ class block final : public byte_span {
    */
   [[nodiscard]] std::pair<block, block> split(std::size_t bytes) const
   {
+    printf("at block::split\n");
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(size() > bytes);
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
@@ -283,9 +284,11 @@ class superblock final : public byte_span {
   {
     RMM_LOGGING_ASSERT(size >= minimum_size);
     RMM_LOGGING_ASSERT(size <= maximum_size);
+    printf("superblock_constructor\n");
     block b{pointer ,size};
     free_blocks_.insert(b);
     free_blocks_by_size_.insert(b);
+    printf("done superblock_constructor\n");
   }
 
   // Disable copy semantics.
@@ -341,7 +344,11 @@ class superblock final : public byte_span {
    */
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
+    printf("superblock::fits\n");
     RMM_LOGGING_ASSERT(is_valid());
+    if (free_blocks_by_size_.rbegin() == free_blocks_by_size_.rend()) {
+      return false;
+    }
     return size() >= bytes && free_blocks_by_size_.rbegin()->fits(bytes);
   }
 
@@ -397,6 +404,7 @@ class superblock final : public byte_span {
    */
   block first_fit(std::size_t size)
   {
+    printf("superblock::first_fit\n");
     NVTX3_FUNC_RANGE_IN(rmm::librmm_domain)
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(size > 0);
@@ -407,16 +415,23 @@ class superblock final : public byte_span {
 
     // Remove the block from the free list.
     auto const blk  = *iter;
+    printf("removing from free_blocks_by_size\n");
     free_blocks_by_size_.erase(blk);
+    printf("done removing from free_blocks_by_size\n");
     auto const next = free_blocks_.erase(iter);
+    printf("done removing from free_blocks_\n");
 
     if (blk.size() > size) {
       // Split the block and put the remainder back.
       auto const split = blk.split(size);
+      printf("inserting into free_blocks\n");
       free_blocks_.insert(next, split.second);
+      printf("inserting into free_blocks_by_size\n");
       free_blocks_by_size_.insert(split.second);
+      printf("done inserting into free_blocks_by_size\n");
       return split.first;
     }
+    printf("done with superblock::first_fit\n");
     return blk;
   }
 
@@ -456,16 +471,17 @@ class superblock final : public byte_span {
       free_blocks_.insert(iter, merged);
       free_blocks_by_size_.insert(merged);
     } else if (merge_prev) {
+      printf("merge_prev\n");
       auto const merged = previous->merge(blk);
-      free_blocks_.erase(*previous);
+      free_blocks_by_size_.erase(*previous);
       auto const iter   = free_blocks_.erase(previous);
 
       free_blocks_.insert(iter, merged);
       free_blocks_by_size_.insert(merged);
     } else if (merge_next) {
       auto const merged = blk.merge(*next);
+      free_blocks_by_size_.erase(*next);
       auto const iter   = free_blocks_.erase(next);
-      free_blocks_.erase(*next);
 
       free_blocks_.insert(iter, merged);
       free_blocks_by_size_.insert(iter, merged);
@@ -762,7 +778,7 @@ class global_arena final {
    */
   superblock first_fit(std::size_t size)
   {
-    rmm::scoped_range rng{"superblock first_fit"};
+    rmm::scoped_range rng{"global_arena::first_fit"};
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [=](auto const& sblk) { return sblk.fits(size); });
@@ -950,6 +966,7 @@ class arena {
    */
   block first_fit(std::size_t size)
   {
+    printf("arena::first_fit\n");
     rmm::scoped_range rng{"arena first_fit"};
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
@@ -958,9 +975,12 @@ class arena {
       return {}; 
     }
 
+    printf("arena::first_fit found sblk\n");
     auto sblk      = std::move(superblocks_.extract(iter).value());
+    printf("arena::first_fit moved sblk\n");
     auto const blk = sblk.first_fit(size);
     superblocks_.insert(std::move(sblk));
+    printf("done arena::first_fit\n");
     return blk;
   }
 

@@ -470,7 +470,7 @@ class superblock final : public byte_span {
       auto const iter   = free_blocks_.erase(next);
 
       free_blocks_.insert(iter, merged);
-      free_blocks_by_size_.insert(iter, merged);
+      free_blocks_by_size_.insert(merged);
     } else {
 
       free_blocks_.insert(next, blk);

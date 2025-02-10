@@ -627,8 +627,8 @@ class global_arena final {
   {
     rmm::scoped_range rng{"global_arena::allocate"};
     RMM_LOGGING_ASSERT(handles(size));
-    rmm::scoped_range rng2{"global_arena::allocate::got_lock"};
     std::lock_guard lock(mtx_);
+    rmm::scoped_range rng2{"global_arena::allocate::got_lock"};
     auto sblk = first_fit(size);
     if (sblk.is_valid()) {
       auto blk = sblk.first_fit(size);

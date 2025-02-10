@@ -162,10 +162,10 @@ class arena_memory_resource final : public device_memory_resource {
     }
 
     {
-    rmm::scoped_range rng{"a:do_allocate:step2:defrag"};
+    rmm::scoped_range rng2{"a:do_allocate:step2:defrag"};
       std::unique_lock lock(mtx_);
       defragment();
-    rmm::scoped_range rng{"a:do_allocate:step2:alloc"};
+    rmm::scoped_range rng3{"a:do_allocate:step2:alloc"};
       void* pointer = arena.allocate(bytes);
       if (pointer == nullptr) {
         if (dump_log_on_failure_) { dump_memory_log(bytes); }

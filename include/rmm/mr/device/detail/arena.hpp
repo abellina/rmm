@@ -665,10 +665,15 @@ class global_arena final {
   {
     rmm::scoped_range rng{"global_arena::deallocate"};
     std::lock_guard lock(mtx_);
-
+    if (superblocks_.empty()) {
+      return false;
+    }
     block const blk{ptr, bytes};
     auto test_sb = superblock(ptr, 0);
-    auto first_addr = superblocks_.lower_bound(test_sb);
+    auto first_addr = superblocks_.upper_bound(test_sb);
+    if (first_addr != superblocks_.cbegin()) {
+      first_addr--;
+    }
     auto const iter = std::find_if(first_addr,
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });

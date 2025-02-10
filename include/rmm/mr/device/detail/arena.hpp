@@ -284,6 +284,7 @@ class superblock final : public byte_span {
     RMM_LOGGING_ASSERT(size >= minimum_size);
     RMM_LOGGING_ASSERT(size <= maximum_size);
     free_blocks_.emplace(pointer, size);
+    free_blocks_by_size_.emplace(size);
   }
 
   // Disable copy semantics.
@@ -340,9 +341,7 @@ class superblock final : public byte_span {
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
     RMM_LOGGING_ASSERT(is_valid());
-    return size() >= bytes && std::any_of(free_blocks_.cbegin(), free_blocks_.cend(), [bytes](auto const& blk) {
-      return blk.fits(bytes);
-    });
+    return size() >= bytes && free_blocks_by_size_.rbegin()->fits(bytes);
   }
 
   /**
@@ -406,16 +405,25 @@ class superblock final : public byte_span {
 
     // Remove the block from the free list.
     auto const blk  = *iter;
+    free_blocks_by_size_.erase(blk);
     auto const next = free_blocks_.erase(iter);
 
     if (blk.size() > size) {
       // Split the block and put the remainder back.
       auto const split = blk.split(size);
       free_blocks_.insert(next, split.second);
+      free_blocks_by_size_.insert(split.second);
       return split.first;
     }
     return blk;
   }
+
+  struct blocks_by_size {
+    bool operator()(block const& lhs, block const& rhs) const
+    {
+      return lhs.size() < rhs.size();
+    }
+  };
 
   /**
    * @brief Coalesce the given block with other free blocks.
@@ -438,20 +446,31 @@ class superblock final : public byte_span {
     bool const merge_next = next != free_blocks_.cend() && blk.is_contiguous_before(*next);
 
     if (merge_prev && merge_next) {
+      free_blocks_by_size_.erase(*previous);
+      free_blocks_by_size_.erase(*next);
       auto const merged = previous->merge(blk).merge(*next);
       free_blocks_.erase(previous);
       auto const iter = free_blocks_.erase(next);
       free_blocks_.insert(iter, merged);
+      free_blocks_by_size_.insert(merged);
     } else if (merge_prev) {
       auto const merged = previous->merge(blk);
+      free_blocks_.erase(*previous);
       auto const iter   = free_blocks_.erase(previous);
+
       free_blocks_.insert(iter, merged);
+      free_blocks_by_size_.insert(merged);
     } else if (merge_next) {
       auto const merged = blk.merge(*next);
       auto const iter   = free_blocks_.erase(next);
+      free_blocks_.erase(*next);
+
       free_blocks_.insert(iter, merged);
+      free_blocks_by_size_.insert(iter, merged);
     } else {
+
       free_blocks_.insert(next, blk);
+      free_blocks_by_size_.insert(blk);
     }
   }
 
@@ -468,12 +487,13 @@ class superblock final : public byte_span {
   [[nodiscard]] std::size_t max_free_size() const
   {
     if (free_blocks_.empty()) { return 0; }
-    return std::max_element(free_blocks_.cbegin(), free_blocks_.cend(), block_size_compare)->size();
+    return free_blocks_by_size_.rbegin()->size();
   }
 
  private:
   /// Address-ordered set of free blocks.
   std::set<block> free_blocks_{};
+  std::set<block, blocks_by_size> free_blocks_by_size_{};
 };
 
 /// Calculate the total free size of a set of superblocks.
@@ -635,7 +655,8 @@ class global_arena final {
     std::lock_guard lock(mtx_);
 
     block const blk{ptr, bytes};
-    auto const iter = std::find_if(superblocks_.cbegin(),
+    auto first_addr = superblocks_.lower_bound(block);
+    auto const iter = std::find_if(first_addr.cbegin(),
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
     if (iter == superblocks_.cend()) { return false; }
@@ -923,6 +944,7 @@ class arena {
    */
   block first_fit(std::size_t size)
   {
+    rmm::scoped_range rng{"arena first_fit"};
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [size](auto const& sblk) { return sblk.fits(size); });

@@ -778,6 +778,20 @@ class global_arena final {
     superblocks_.emplace(upstream_block_.pointer(), size);
   }
 
+  std::set<superblock>::const_iterator find_begin_by_size(std::size_t size) const {
+    block tester {0, size};
+    auto it = superblocks_by_size_.lower_bound(tester);
+    if (it == superblocks_by_size_.end()) {
+      // no superblock can hold this size
+      return superblocks_.cend();
+    } else {
+      // found a superblock at it->address() that has enough free
+      superblock stester {it->pointer(), 0};
+      // find the actual superblock
+      return superblocks_.lower_bound(stester);
+    }
+  }
+
   /**
    * @brief Get the first superblock that can fit a block of at least `size` bytes.
    *
@@ -795,10 +809,9 @@ class global_arena final {
   superblock first_fit(std::size_t size)
   {
     rmm::scoped_range rng{"global_arena::first_fit"};
-    auto const iter = std::find_if(superblocks_.cbegin(),
+    auto const iter = std::find_if(find_begin_by_size(size),
                                    superblocks_.cend(),
                                    [=](auto const& sblk) { return sblk.fits(size); });
-
     if (iter == superblocks_.cend()) {
       return {};
     }

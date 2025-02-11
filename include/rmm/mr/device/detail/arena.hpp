@@ -779,6 +779,7 @@ class global_arena final {
   }
 
   std::set<superblock>::const_iterator find_begin_by_size(std::size_t size) const {
+    rmm::scoped_range rng{"find_begin_by_size"};
     block tester {0, size};
     auto it = superblocks_by_size_.lower_bound(tester);
     if (it == superblocks_by_size_.end()) {

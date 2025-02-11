@@ -1008,6 +1008,7 @@ class arena {
       auto const iter = std::find_if(
         superblocks_.cbegin(), superblocks_.cend(), [](auto const& sblk) { return sblk.empty(); });
       if (iter == superblocks_.cend()) { return; }
+      erase_from_sbys(*iter);
       global_arena_.release(std::move(superblocks_.extract(iter).value()));
     }
   }
@@ -1045,15 +1046,17 @@ class arena {
   block first_fit(std::size_t size)
   {
     rmm::scoped_range rng{"arena first_fit"};
-    auto const iter = std::find_if(superblocks_.cbegin(),
+    auto const iter = std::find_if(find_begin_by_size(size),
                                    superblocks_.cend(),
                                    [size](auto const& sblk) { return sblk.fits(size); });
     if (iter == superblocks_.cend()) { 
       return {}; 
     }
 
+    erase_from_sbys(*iter);
     auto sblk      = std::move(superblocks_.extract(iter).value());
     auto const blk = sblk.first_fit(size);
+    superblocks_by_size_.emplace(sblk.pointer(), sblk.max_free_size());
     superblocks_.insert(std::move(sblk));
     return blk;
   }
@@ -1067,13 +1070,16 @@ class arena {
    */
   bool deallocate_from_superblock(block const& blk)
   {
+    rmm::scoped_range rng{"arena deallocate_from_superblock"};
     auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
     if (iter == superblocks_.cend()) { return false; }
 
+    erase_from_sbys(*iter);
     auto sblk = std::move(superblocks_.extract(iter).value());
     sblk.coalesce(blk);
+    superblocks_by_size_.emplace(sblk.pointer(), sblk.max_free_size());
     superblocks_.insert(std::move(sblk));
     return true;
   }
@@ -1090,6 +1096,7 @@ class arena {
     if (sblk.is_valid()) {
       RMM_LOGGING_ASSERT(sblk.size() >= superblock::minimum_size);
       auto const blk = sblk.first_fit(size);
+      superblocks_by_size_.emplace(sblk.pointer(), sblk.max_free_size());
       superblocks_.insert(std::move(sblk));
       return blk;
     }
@@ -1100,6 +1107,29 @@ class arena {
   global_arena& global_arena_;
   /// Acquired superblocks.
   std::set<superblock> superblocks_;
+  std::set<block, blocks_by_size> superblocks_by_size_;
+
+  void erase_from_sbys(superblock const& to_remove) {
+    if (superblocks_by_size_.erase({to_remove.pointer(), to_remove.max_free_size()}) != 1) {
+      throw std::runtime_error("failed to remove free superblock in arena");
+    }
+  }
+
+  std::set<superblock>::const_iterator find_begin_by_size(std::size_t size) const {
+    rmm::scoped_range rng{"arena::find_begin_by_size"};
+    block tester {0, size};
+    auto it = superblocks_by_size_.lower_bound(tester);
+    if (it == superblocks_by_size_.end()) {
+      // no superblock can hold this size
+      return superblocks_.cend();
+    } else {
+      // found a superblock at it->address() that has enough free
+      superblock stester {it->pointer(), 0};
+      // find the actual superblock
+      return superblocks_.lower_bound(stester);
+    }
+  }
+
   /// Mutex for exclusive lock.
   mutable std::mutex mtx_;
 };

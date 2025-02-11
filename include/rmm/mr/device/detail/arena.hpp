@@ -697,7 +697,7 @@ class global_arena final {
     block const blk{ptr, bytes};
     rmm::scoped_range rng4{"global_arena::deallocate::superblock_construct"};
     rmm::scoped_range rng6{"global_arena::deallocate::find_if"};
-    auto const iter = std::find_if(superblocks_.cbegin(),
+    auto const iter = std::find_if(find_begin_by_address(ptr),
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
     if (iter == superblocks_.cend()) { return false; }
@@ -798,6 +798,30 @@ class global_arena final {
       superblock stester {it->pointer(), 0};
       // find the actual superblock
       return superblocks_.lower_bound(stester);
+    }
+  }
+
+  std::set<superblock>::const_iterator find_begin_by_address(void* address) const {
+    rmm::scoped_range rng{"global_arena::find_begin_by_address"};
+    if (superblocks_.empty()) {
+      return superblocks_.cend();
+    }
+    superblock tester {address, 0};
+    auto it = superblocks_.lower_bound(tester);
+    if (it == superblocks_.end()) {
+      auto last = superblocks_.rbegin();
+      if (last->pointer() + last->size() >= address) {
+        superblock stester {last->pointer(), 0};
+        return superblocks_.lower_bound(stester);
+      } else {
+        // no superblock can hold this address
+        return superblocks_.cend();
+      }
+    } else {
+      if (it != superblocks_.begin() && it->pointer() > address) { 
+        it--;
+      }
+      return it;
     }
   }
 

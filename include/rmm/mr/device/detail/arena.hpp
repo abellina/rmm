@@ -257,6 +257,19 @@ struct size_comparator {
   }
 };
 
+  struct blocks_by_size {
+    bool operator()(block const& lhs, block const& rhs) const
+    {
+      if (lhs.size() < rhs.size()) {
+        return true; 
+      } else if (lhs.size() == rhs.size()) {
+        return lhs.pointer() < rhs.pointer();
+      }
+      return false;
+    }
+  };
+
+
 /**
  * @brief Represents a large chunk of memory that is exchanged between the global arena and
  * per-thread arenas.
@@ -345,7 +358,7 @@ class superblock final : public byte_span {
     if (free_blocks_by_size_.empty()) {
       return false;
     }
-    return size() >= bytes && free_blocks_by_size_.begin()->fits(bytes);
+    return size() >= bytes && free_blocks_by_size_.rbegin()->fits(bytes);
   }
 
   /**
@@ -404,15 +417,30 @@ class superblock final : public byte_span {
     RMM_LOGGING_ASSERT(size > 0);
 
     auto fits       = [size](auto const& blk) { return blk.fits(size); };
-    auto b = free_blocks_by_size_.begin();
-    if (b != free_blocks_by_size_.end()) {
+    auto s = free_blocks_by_size_.rbegin();
+    while (s != free_blocks_by_size_.rend()) {
+      printf("fbbs: %p %lu\n", s->pointer(), s->size());
+      s++;
+    }
+    auto b = free_blocks_by_size_.rbegin();
+    if (b != free_blocks_by_size_.rend()) {
+      printf("trying to fit  %lu in %p %lu\n", size, b->pointer(), b->size());
       if (!b->fits(size)) {
         return {};
       }
     }
+    printf("at allocate, would fit\n");
+    block search_block {0, size};
+    auto it = free_blocks_by_size_.lower_bound(search_block);
+    printf("lower_bound from fbbs says %p\n", it->pointer()); 
+    block search_block_addr {it->pointer(), 0};
+    auto fit = free_blocks_.lower_bound(search_block_addr);
+    printf("lower_bound from fbs says %p\n", fit->pointer()); 
+    
     // else, expensive by address search
-    auto const iter = std::find_if(free_blocks_.cbegin(), free_blocks_.cend(), fits);
+    auto const iter = std::find_if(fit, free_blocks_.cend(), fits);
     if (iter == free_blocks_.cend()) { return {}; }
+    printf("allocated in %p %lu\n", iter->pointer(), iter->size());
 
     // Remove the block from the free list.
     auto const blk  = *iter;
@@ -428,18 +456,6 @@ class superblock final : public byte_span {
     }
     return blk;
   }
-
-  struct blocks_by_size {
-    bool operator()(block const& lhs, block const& rhs) const
-    {
-      if (lhs.size() > rhs.size()) {
-        return true; 
-      } else if (lhs.size() == rhs.size()) {
-        return lhs.pointer() < rhs.pointer();
-      }
-      return false;
-    }
-  };
 
   /**
    * @brief Coalesce the given block with other free blocks.
@@ -503,7 +519,7 @@ class superblock final : public byte_span {
   [[nodiscard]] std::size_t max_free_size() const
   {
     if (free_blocks_.empty()) { return 0; }
-    return free_blocks_by_size_.begin()->size();
+    return free_blocks_by_size_.rbegin()->size();
   }
 
  private:
@@ -529,18 +545,6 @@ inline auto max_free_size(std::set<superblock> const& superblocks)
     size = std::max(size, sblk.max_free_size());
   }
   return size;
-};
-
-struct superblocks_by_size {
-  bool operator()(block const& lhs, block const& rhs) const
-  {
-    if(lhs.size() < rhs.size()){
-      return true;
-    } else if (lhs.size() == rhs.size()){ 
-      return lhs.pointer() < rhs.pointer();
-    }
-    return false;
-  }
 };
 
 /**
@@ -616,6 +620,7 @@ class global_arena final {
   void release(superblock&& sblk)
   {
     RMM_LOGGING_ASSERT(sblk.is_valid());
+    printf("releasing: %p %lu\n", sblk.pointer(), sblk.max_free_size());
     std::lock_guard lock(mtx_);
     coalesce(std::move(sblk));
   }
@@ -655,6 +660,8 @@ class global_arena final {
       superblocks_by_size_.emplace(sblk.pointer(), sblk.max_free_size());
       superblocks_.insert(std::move(sblk));
       return blk.pointer();
+    } else {
+      printf("got invalid sblk\n");
     }
     return nullptr;
   }
@@ -808,17 +815,19 @@ class global_arena final {
   superblock first_fit(std::size_t size)
   {
     rmm::scoped_range rng{"global_arena::first_fit"};
-    block sbs {nullptr, size};
+    block sbs {0, size};
     auto sbsit = superblocks_by_size_.lower_bound(sbs);
     if (sbsit == superblocks_by_size_.end()) {
+      printf("DID NOT found upper bound\n");
       return {};
     }
+    printf("found for first_fit(%lu) upper bound address: %p %lu\n", size, sbsit->pointer(), sbsit->size());
     superblock t {sbsit->pointer(), 0};
     auto sbait = superblocks_.lower_bound(t);
     auto const iter = std::find_if(sbait,
                                    superblocks_.cend(),
                                    [=](auto const& sblk) { return sblk.fits(size); });
-    if (iter == superblocks_.cend()) { return {}; }
+    if (iter == superblocks_.cend()) { printf("no superblock\n"); return {}; }
 
     superblocks_by_size_.erase(sbsit);
     auto sblk           = std::move(superblocks_.extract(iter).value());
@@ -864,11 +873,16 @@ class global_arena final {
       superblocks_.insert(std::move(merged));
     } else if (merge_prev) {
       block pblk {previous->pointer(), previous->max_free_size()};
-      superblocks_by_size_.erase(pblk);
+      auto res = superblocks_by_size_.erase(pblk);
+      printf("erasing previous: %p %lu success=%li\n", previous->pointer(), previous->max_free_size(), res);
+
       auto prev_sb = std::move(superblocks_.extract(previous).value());
       auto merged  = prev_sb.merge(sblk);
+      printf("merged: %p %lu success=%li\n", merged.pointer(), merged.max_free_size(), res);
+
       superblocks_by_size_.emplace(merged.pointer(), merged.max_free_size());
-      superblocks_.insert(std::move(merged));
+      auto inserted = superblocks_.insert(std::move(merged));
+      printf("inserted merged?: %i\n", inserted.second);
     } else if (merge_next) {
       block nblk {next->pointer(), next->max_free_size()};
       superblocks_by_size_.erase(nblk);
@@ -889,7 +903,7 @@ class global_arena final {
   block upstream_block_;
   /// Address-ordered set of superblocks.
   std::set<superblock> superblocks_;
-  std::set<block, superblocks_by_size> superblocks_by_size_;
+  std::set<block, blocks_by_size> superblocks_by_size_;
   /// Mutex for exclusive lock.
   mutable std::mutex mtx_;
 };

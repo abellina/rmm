@@ -340,6 +340,17 @@ TEST_F(ArenaTest, GlobalArenaReleaseMergePrevious)  // NOLINT
   EXPECT_EQ(ptr, fake_address3);
 }
 
+TEST_F(ArenaTest, GlobalArenaReleaseMergePreviousSmaller)  // NOLINT
+{
+  auto sblk = global->acquire(256);
+  auto sb2  = global->acquire(1_KiB);
+  global->acquire(512);
+  global->release(std::move(sblk));
+  global->release(std::move(sb2));
+  auto* ptr = global->allocate(superblock::minimum_size * 2 - 1);
+  EXPECT_EQ(ptr, fake_address3);
+}
+
 TEST_F(ArenaTest, GlobalArenaReleaseMergePreviousAndNext)  // NOLINT
 {
   auto sblk = global->acquire(256);
@@ -563,6 +574,25 @@ TEST_F(ArenaTest, PerThreadToStreamDealloc)  // NOLINT
   mr.deallocate(thread_ptr, 256, rmm::cuda_stream_per_thread);
   mr.deallocate(ptr1, superblock::minimum_size, rmm::cuda_stream_view{});
   mr.deallocate(ptr2, 32_KiB, rmm::cuda_stream_view{});
+}
+
+TEST_F(ArenaTest, Testing)  // NOLINT
+{
+  // This is testing that deallocation of a ptr still works when
+  // it was originally allocated in a superblock that was in a thread
+  // arena that then moved to global arena during a defragmentation
+  // and then moved to a stream arena.
+  auto const arena_size = superblock::minimum_size * 10;
+  arena_mr mr(rmm::mr::get_current_device_resource_ref(), arena_size, arena_size);
+  // Create an allocation from a per thread arena
+  auto alloc_size = superblock::minimum_size + 1;
+  void* thread_ptr = mr.allocate(alloc_size, rmm::cuda_stream_per_thread);
+  void* thread_ptr2 = mr.allocate(alloc_size, rmm::cuda_stream_per_thread);
+  void* thread_ptr3 = mr.allocate(alloc_size, rmm::cuda_stream_per_thread);
+
+  mr.deallocate(thread_ptr2, alloc_size, rmm::cuda_stream_per_thread);
+  mr.deallocate(thread_ptr, alloc_size, rmm::cuda_stream_per_thread);
+  mr.deallocate(thread_ptr3, alloc_size, rmm::cuda_stream_per_thread);
 }
 
 TEST_F(ArenaTest, DumpLogOnFailure)  // NOLINT

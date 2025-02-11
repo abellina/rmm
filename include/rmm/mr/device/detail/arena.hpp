@@ -342,10 +342,10 @@ class superblock final : public byte_span {
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
     RMM_LOGGING_ASSERT(is_valid());
-    if (free_blocks_by_size_.rbegin() == free_blocks_by_size_.rend()) {
+    if (free_blocks_by_size_.empty()) {
       return false;
     }
-    return size() >= bytes && free_blocks_by_size_.rbegin()->fits(bytes);
+    return size() >= bytes && free_blocks_by_size_.begin()->fits(bytes);
   }
 
   /**
@@ -404,8 +404,9 @@ class superblock final : public byte_span {
     RMM_LOGGING_ASSERT(size > 0);
 
     auto fits       = [size](auto const& blk) { return blk.fits(size); };
-    if (free_blocks_by_size_.rbegin() != free_blocks_by_size_.rend()) {
-      if (!free_blocks_by_size_.rbegin()->fits(size)) {
+    auto b = free_blocks_by_size_.begin();
+    if (b != free_blocks_by_size_.end()) {
+      if (!b->fits(size)) {
         return {};
       }
     }
@@ -431,7 +432,7 @@ class superblock final : public byte_span {
   struct blocks_by_size {
     bool operator()(block const& lhs, block const& rhs) const
     {
-      return lhs.size() < rhs.size();
+      return lhs.size() > rhs.size();
     }
   };
 
@@ -497,7 +498,7 @@ class superblock final : public byte_span {
   [[nodiscard]] std::size_t max_free_size() const
   {
     if (free_blocks_.empty()) { return 0; }
-    return free_blocks_by_size_.rbegin()->size();
+    return free_blocks_by_size_.begin()->size();
   }
 
  private:
@@ -526,9 +527,14 @@ inline auto max_free_size(std::set<superblock> const& superblocks)
 };
 
 struct superblocks_by_size {
-  bool operator()(superblock const& lhs, superblock const& rhs) const
+  bool operator()(block const& lhs, block const& rhs) const
   {
-    return lhs.size() < rhs.size();
+    if(lhs.size() < rhs.size()){
+      return true;
+    } else if (lhs.size() == rhs.size()){ 
+      return lhs.pointer() < rhs.pointer();
+    }
+    return false;
   }
 };
 
@@ -619,6 +625,8 @@ class global_arena final {
     std::lock_guard lock(mtx_);
     while (!superblocks.empty()) {
       auto sblk = std::move(superblocks.extract(superblocks.cbegin()).value());
+      block sblks {sblk.pointer(), sblk.max_free_size() };
+      superblocks_by_size_.erase(sblks);
       RMM_LOGGING_ASSERT(sblk.is_valid());
       coalesce(std::move(sblk));
     }
@@ -639,6 +647,7 @@ class global_arena final {
     auto sblk = first_fit(size);
     if (sblk.is_valid()) {
       auto blk = sblk.first_fit(size);
+      superblocks_by_size_.emplace(sblk.pointer(), sblk.max_free_size());
       superblocks_.insert(std::move(sblk));
       return blk.pointer();
     }
@@ -694,11 +703,14 @@ class global_arena final {
     if (iter == superblocks_.cend()) { return false; }
 
     rmm::scoped_range rng7{"global_arena::deallocate::extract"};
+    block sbs {iter->pointer(), 0};
+    superblocks_by_size_.erase(sbs);
     auto sblk = std::move(superblocks_.extract(iter).value());
     sblk.coalesce(blk);
     if (sblk.empty()) {
       coalesce(std::move(sblk));
     } else {
+      superblocks_by_size_.emplace(sblk.pointer(), sblk.max_free_size());
       superblocks_.insert(std::move(sblk));
     }
     return true;
@@ -770,6 +782,7 @@ class global_arena final {
   void initialize(std::size_t size)
   {
     upstream_block_ = {upstream_mr_.allocate(size), size};
+    superblocks_by_size_.emplace(upstream_block_.pointer(), size);
     superblocks_.emplace(upstream_block_.pointer(), size);
   }
 
@@ -790,11 +803,19 @@ class global_arena final {
   superblock first_fit(std::size_t size)
   {
     rmm::scoped_range rng{"global_arena::first_fit"};
-    auto const iter = std::find_if(superblocks_.cbegin(),
+    block sbs {nullptr, size};
+    auto sbsit = superblocks_by_size_.lower_bound(sbs);
+    if (sbsit == superblocks_by_size_.end()) {
+      return {};
+    }
+    superblock t {sbsit->pointer(), 0};
+    auto sbait = superblocks_.lower_bound(t);
+    auto const iter = std::find_if(sbait,
                                    superblocks_.cend(),
                                    [=](auto const& sblk) { return sblk.fits(size); });
     if (iter == superblocks_.cend()) { return {}; }
 
+    superblocks_by_size_.erase(sbsit);
     auto sblk           = std::move(superblocks_.extract(iter).value());
     rmm::scoped_range rng2{"global_arena::first_fit::got sblk"};
 
@@ -802,6 +823,7 @@ class global_arena final {
     if (sblk.empty() && sblk.size() >= min_size + superblock::minimum_size) {
       // Split the superblock and put the remainder back.
       auto [head, tail] = sblk.split(min_size);
+      superblocks_by_size_.emplace(tail.pointer(), tail.max_free_size());
       superblocks_.insert(std::move(tail));
       return std::move(head);
     }
@@ -826,19 +848,32 @@ class global_arena final {
     bool const merge_next = next != superblocks_.cend() && sblk.is_contiguous_before(*next);
 
     if (merge_prev && merge_next) {
+      block pblk {previous->pointer(), previous->max_free_size()};
+      block nblk {next->pointer(), next->max_free_size()};
+      superblocks_by_size_.erase(pblk);
+      superblocks_by_size_.erase(nblk);
       auto prev_sb = std::move(superblocks_.extract(previous).value());
       auto next_sb = std::move(superblocks_.extract(next).value());
       auto merged  = prev_sb.merge(sblk).merge(next_sb);
+      superblocks_by_size_.emplace(merged.pointer(), merged.max_free_size());
       superblocks_.insert(std::move(merged));
     } else if (merge_prev) {
+      block pblk {previous->pointer(), previous->max_free_size()};
+      superblocks_by_size_.erase(pblk);
       auto prev_sb = std::move(superblocks_.extract(previous).value());
       auto merged  = prev_sb.merge(sblk);
+      superblocks_by_size_.emplace(merged.pointer(), merged.max_free_size());
       superblocks_.insert(std::move(merged));
     } else if (merge_next) {
+      block nblk {next->pointer(), next->max_free_size()};
+      superblocks_by_size_.erase(nblk);
       auto next_sb = std::move(superblocks_.extract(next).value());
       auto merged  = sblk.merge(next_sb);
+      superblocks_by_size_.emplace(merged.pointer(), merged.max_free_size());
       superblocks_.insert(std::move(merged));
+      
     } else {
+      superblocks_by_size_.emplace(sblk.pointer(), sblk.max_free_size());
       superblocks_.insert(std::move(sblk));
     }
   }
@@ -849,6 +884,7 @@ class global_arena final {
   block upstream_block_;
   /// Address-ordered set of superblocks.
   std::set<superblock> superblocks_;
+  std::set<block, superblocks_by_size> superblocks_by_size_;
   /// Mutex for exclusive lock.
   mutable std::mutex mtx_;
 };

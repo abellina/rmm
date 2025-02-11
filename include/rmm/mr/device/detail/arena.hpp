@@ -703,7 +703,7 @@ class global_arena final {
     if (iter == superblocks_.cend()) { return false; }
 
     rmm::scoped_range rng7{"global_arena::deallocate::extract"};
-    block sbs {iter->pointer(), 0};
+    block sbs {iter->pointer(), iter->max_free_size()};
     superblocks_by_size_.erase(sbs);
     auto sblk = std::move(superblocks_.extract(iter).value());
     sblk.coalesce(blk);

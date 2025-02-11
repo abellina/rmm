@@ -432,7 +432,12 @@ class superblock final : public byte_span {
   struct blocks_by_size {
     bool operator()(block const& lhs, block const& rhs) const
     {
-      return lhs.size() > rhs.size();
+      if (lhs.size() > rhs.size()) {
+        return true; 
+      } else if (lhs.size() == rhs.size()) {
+        return lhs.pointer() < rhs.pointer();
+      }
+      return false;
     }
   };
 

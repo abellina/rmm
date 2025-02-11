@@ -815,6 +815,7 @@ class global_arena final {
     if (iter == superblocks_.cend()) {
       return {};
     }
+    rmm::scoped_range rng1a{"global_arena::first_fit::erase_and_extract"};
     erase_from_sbys(*iter);
     auto sblk           = std::move(superblocks_.extract(iter).value());
     rmm::scoped_range rng2{"global_arena::first_fit::got sblk"};

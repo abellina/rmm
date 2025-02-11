@@ -430,7 +430,7 @@ class superblock final : public byte_span {
 
     // Remove the block from the free list.
     auto const blk  = *iter;
-    free_blocks_by_size_.erase(blk);
+    erase_from_fbys(blk);
     auto const next = free_blocks_.erase(iter);
 
     if (blk.size() > size) {
@@ -464,8 +464,8 @@ class superblock final : public byte_span {
     bool const merge_next = next != free_blocks_.cend() && blk.is_contiguous_before(*next);
 
     if (merge_prev && merge_next) {
-      free_blocks_by_size_.erase(*previous);
-      free_blocks_by_size_.erase(*next);
+      erase_from_fbys(*previous);
+      erase_from_fbys(*next);
       auto const merged = previous->merge(blk).merge(*next);
       free_blocks_.erase(previous);
       auto const iter = free_blocks_.erase(next);
@@ -473,20 +473,19 @@ class superblock final : public byte_span {
       free_blocks_by_size_.insert(merged);
     } else if (merge_prev) {
       auto const merged = previous->merge(blk);
-      free_blocks_by_size_.erase(*previous);
+      erase_from_fbys(*previous);
       auto const iter   = free_blocks_.erase(previous);
 
       free_blocks_.insert(iter, merged);
       free_blocks_by_size_.insert(merged);
     } else if (merge_next) {
       auto const merged = blk.merge(*next);
-      free_blocks_by_size_.erase(*next);
+      erase_from_fbys(*next);
       auto const iter   = free_blocks_.erase(next);
 
       free_blocks_.insert(iter, merged);
       free_blocks_by_size_.insert(merged);
     } else {
-
       free_blocks_.insert(next, blk);
       free_blocks_by_size_.insert(blk);
     }
@@ -512,6 +511,12 @@ class superblock final : public byte_span {
   /// Address-ordered set of free blocks.
   std::set<block> free_blocks_{};
   std::set<block, blocks_by_size> free_blocks_by_size_{};
+
+  void erase_from_fbys(block const& to_remove) {
+    if (free_blocks_by_size_.erase({to_remove.pointer(), to_remove.size()}) != 1) {
+      throw std::runtime_error("failed to remove free block");
+    }
+  }
 };
 
 /// Calculate the total free size of a set of superblocks.
@@ -620,8 +625,6 @@ class global_arena final {
     std::lock_guard lock(mtx_);
     while (!superblocks.empty()) {
       auto sblk = std::move(superblocks.extract(superblocks.cbegin()).value());
-      block sblks {sblk.pointer(), sblk.max_free_size() };
-      superblocks_by_size_.erase(sblks);
       RMM_LOGGING_ASSERT(sblk.is_valid());
       coalesce(std::move(sblk));
     }
@@ -796,7 +799,10 @@ class global_arena final {
                                    superblocks_.cend(),
                                    [=](auto const& sblk) { return sblk.fits(size); });
 
-    superblocks_by_size_.erase(sbsit);
+    if (iter == superblocks_.cend()) {
+      return {};
+    }
+    erase_from_sbys(*iter);
     auto sblk           = std::move(superblocks_.extract(iter).value());
     rmm::scoped_range rng2{"global_arena::first_fit::got sblk"};
 
@@ -829,26 +835,22 @@ class global_arena final {
     bool const merge_next = next != superblocks_.cend() && sblk.is_contiguous_before(*next);
 
     if (merge_prev && merge_next) {
-      block pblk {previous->pointer(), previous->max_free_size()};
-      block nblk {next->pointer(), next->max_free_size()};
-      superblocks_by_size_.erase(pblk);
-      superblocks_by_size_.erase(nblk);
+      erase_from_sbys(*previous);
+      erase_from_sbys(*next);
       auto prev_sb = std::move(superblocks_.extract(previous).value());
       auto next_sb = std::move(superblocks_.extract(next).value());
       auto merged  = prev_sb.merge(sblk).merge(next_sb);
       superblocks_by_size_.emplace(merged.pointer(), merged.max_free_size());
       superblocks_.insert(std::move(merged));
     } else if (merge_prev) {
-      block pblk {previous->pointer(), previous->max_free_size()};
-      superblocks_by_size_.erase(pblk);
+      erase_from_sbys(*previous);
       auto prev_sb = std::move(superblocks_.extract(previous).value());
       auto merged  = prev_sb.merge(sblk);
 
       superblocks_by_size_.emplace(merged.pointer(), merged.max_free_size());
       superblocks_.insert(std::move(merged));
     } else if (merge_next) {
-      block nblk {next->pointer(), next->max_free_size()};
-      superblocks_by_size_.erase(nblk);
+      erase_from_sbys(*next);
       auto next_sb = std::move(superblocks_.extract(next).value());
       auto merged  = sblk.merge(next_sb);
       superblocks_by_size_.emplace(merged.pointer(), merged.max_free_size());
@@ -867,6 +869,12 @@ class global_arena final {
   /// Address-ordered set of superblocks.
   std::set<superblock> superblocks_;
   std::set<block, blocks_by_size> superblocks_by_size_;
+
+  void erase_from_sbys(superblock const& to_remove) {
+    if (superblocks_by_size_.erase({to_remove.pointer(), to_remove.max_free_size()}) != 1) {
+      throw std::runtime_error("failed to remove free superblock");
+    }
+  }
   /// Mutex for exclusive lock.
   mutable std::mutex mtx_;
 };

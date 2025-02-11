@@ -423,13 +423,9 @@ class superblock final : public byte_span {
         return {};
       }
     }
-    block search_block {0, size};
-    auto it = free_blocks_by_size_.lower_bound(search_block);
-    block search_block_addr {it->pointer(), 0};
-    auto fit = free_blocks_.lower_bound(search_block_addr);
-    
+
     // else, expensive by address search
-    auto const iter = std::find_if(fit, free_blocks_.cend(), fits);
+    auto const iter = std::find_if(free_blocks_.cbegin(), free_blocks_.cend(), fits);
     if (iter == free_blocks_.cend()) { return {}; }
 
     // Remove the block from the free list.
@@ -689,14 +685,8 @@ class global_arena final {
     rmm::scoped_range rng3{"global_arena::deallocate::block_construct"};
     block const blk{ptr, bytes};
     rmm::scoped_range rng4{"global_arena::deallocate::superblock_construct"};
-    auto test_sb = superblock(ptr, 0);
-    rmm::scoped_range rng5{"global_arena::deallocate::upper_bound"};
-    auto first_addr = superblocks_.upper_bound(test_sb);
-    if (first_addr != superblocks_.cbegin()) {
-      first_addr--;
-    }
     rmm::scoped_range rng6{"global_arena::deallocate::find_if"};
-    auto const iter = std::find_if(first_addr,
+    auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
     if (iter == superblocks_.cend()) { return false; }
@@ -802,14 +792,7 @@ class global_arena final {
   superblock first_fit(std::size_t size)
   {
     rmm::scoped_range rng{"global_arena::first_fit"};
-    block sbs {0, size};
-    auto sbsit = superblocks_by_size_.lower_bound(sbs);
-    if (sbsit == superblocks_by_size_.end()) {
-      return {};
-    }
-    superblock t {sbsit->pointer(), 0};
-    auto sbait = superblocks_.lower_bound(t);
-    auto const iter = std::find_if(sbait,
+    auto const iter = std::find_if(superblocks_.cbegin(),
                                    superblocks_.cend(),
                                    [=](auto const& sblk) { return sblk.fits(size); });
 

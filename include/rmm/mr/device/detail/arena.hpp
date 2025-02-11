@@ -195,7 +195,6 @@ class block final : public byte_span {
    */
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
-    rmm::scoped_range rng{"block::fits"};
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(bytes > 0);
     return size() >= bytes;
@@ -355,18 +354,11 @@ class superblock final : public byte_span {
    */
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
-    rmm::scoped_range rng{"superblock::fits"};
     RMM_LOGGING_ASSERT(is_valid());
     if (free_blocks_by_size_.empty()) {
       return false;
     }
-    auto res = size() >= bytes && free_blocks_by_size_.rbegin()->fits(bytes);
-    if (res) {
-      rmm::scoped_range rng{"does fit"};
-    } else {
-      rmm::scoped_range rng{"does NOT fit"};
-    }
-    return res;
+    return size() >= bytes && free_blocks_by_size_.rbegin()->fits(bytes);
   }
 
   /**
@@ -646,10 +638,8 @@ class global_arena final {
    */
   void* allocate(std::size_t size)
   {
-    rmm::scoped_range rng{"global_arena::allocate"};
     RMM_LOGGING_ASSERT(handles(size));
     std::lock_guard lock(mtx_);
-    rmm::scoped_range rng2{"global_arena::allocate::got_lock"};
     auto sblk = first_fit(size);
     if (sblk.is_valid()) {
       auto blk = sblk.first_fit(size);
@@ -671,7 +661,6 @@ class global_arena final {
    */
   bool deallocate_async(void* ptr, std::size_t size, cuda_stream_view stream)
   {
-    rmm::scoped_range rng{"global_arena::dealocate_async"};
     RMM_LOGGING_ASSERT(handles(size));
     stream.synchronize_no_throw();
     return deallocate(ptr, size);
@@ -687,22 +676,16 @@ class global_arena final {
    */
   bool deallocate(void* ptr, std::size_t bytes)
   {
-    rmm::scoped_range rng{"global_arena::deallocate"};
     std::lock_guard lock(mtx_);
-    rmm::scoped_range rng2{"global_arena::deallocate::got_lock"};
     if (superblocks_.empty()) {
       return false;
     }
-    rmm::scoped_range rng3{"global_arena::deallocate::block_construct"};
     block const blk{ptr, bytes};
-    rmm::scoped_range rng4{"global_arena::deallocate::superblock_construct"};
-    rmm::scoped_range rng6{"global_arena::deallocate::find_if"};
     auto const iter = std::find_if(find_begin_by_address(ptr),
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
     if (iter == superblocks_.cend()) { return false; }
 
-    rmm::scoped_range rng7{"global_arena::deallocate::extract"};
     block sbs {iter->pointer(), iter->max_free_size()};
     superblocks_by_size_.erase(sbs);
     auto sblk = std::move(superblocks_.extract(iter).value());
@@ -787,7 +770,6 @@ class global_arena final {
   }
 
   std::set<superblock>::const_iterator find_begin_by_size(std::size_t size) const {
-    rmm::scoped_range rng{"find_begin_by_size"};
     block tester {0, size};
     auto it = superblocks_by_size_.lower_bound(tester);
     if (it == superblocks_by_size_.end()) {
@@ -802,7 +784,6 @@ class global_arena final {
   }
 
   std::set<superblock>::const_iterator find_begin_by_address(void* address) const {
-    rmm::scoped_range rng{"global_arena::find_begin_by_address"};
     auto e = superblocks_.cend();
     if (superblocks_.empty()) {
       return e;
@@ -864,17 +845,14 @@ class global_arena final {
    */
   superblock first_fit(std::size_t size)
   {
-    rmm::scoped_range rng{"global_arena::first_fit"};
     auto const iter = std::find_if(find_begin_by_size(size),
                                    superblocks_.cend(),
                                    [=](auto const& sblk) { return sblk.fits(size); });
     if (iter == superblocks_.cend()) {
       return {};
     }
-    rmm::scoped_range rng1a{"global_arena::first_fit::erase_and_extract"};
     erase_from_sbys(*iter);
     auto sblk           = std::move(superblocks_.extract(iter).value());
-    rmm::scoped_range rng2{"global_arena::first_fit::got sblk"};
 
     auto const min_size = std::max(superblock::minimum_size, size);
     if (sblk.empty() && sblk.size() >= min_size + superblock::minimum_size) {
@@ -1076,7 +1054,6 @@ class arena {
    */
   block first_fit(std::size_t size)
   {
-    rmm::scoped_range rng{"arena first_fit"};
     auto const iter = std::find_if(find_begin_by_size(size),
                                    superblocks_.cend(),
                                    [size](auto const& sblk) { return sblk.fits(size); });
@@ -1101,7 +1078,6 @@ class arena {
    */
   bool deallocate_from_superblock(block const& blk)
   {
-    rmm::scoped_range rng{"arena deallocate_from_superblock"};
     auto const iter = std::find_if(find_begin_by_address(blk.pointer()),
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
@@ -1147,7 +1123,6 @@ class arena {
   }
 
   std::set<superblock>::const_iterator find_begin_by_size(std::size_t size) const {
-    rmm::scoped_range rng{"arena::find_begin_by_size"};
     block tester {0, size};
     auto it = superblocks_by_size_.lower_bound(tester);
     if (it == superblocks_by_size_.end()) {
@@ -1162,7 +1137,6 @@ class arena {
   }
 
   std::set<superblock>::const_iterator find_begin_by_address(void* address) const {
-    rmm::scoped_range rng{"arena::find_begin_by_address"};
     if (superblocks_.empty()) {
       return superblocks_.cend();
     }

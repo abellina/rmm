@@ -801,21 +801,21 @@ class global_arena final {
     }
   }
 
-  std::set<superblock>::const_iterator find_begin_by_ptr(void* pointer) const {
-    rmm::scoped_range rng{"find_begin_by_pointer"};
-    superblock tester {pointer, 0};
-    auto it = superblocks_.lower_bound(tester);
-    if (it == superblocks_.end()) {
-      auto last = superblocks_.rbegin();
-      if (last->pointer() + last->size() >= pointer) {
-        return last;
-      }
-      // no superblock can hold this size
-      return superblocks_.cend();
-    } else {
-      return it;
-    }
-  }
+  //std::set<superblock>::const_iterator find_begin_by_ptr(void* pointer) const {
+  //  rmm::scoped_range rng{"find_begin_by_pointer"};
+  //  superblock tester {pointer, 0};
+  //  auto it = superblocks_.lower_bound(tester);
+  //  if (it == superblocks_.end()) {
+  //    auto last = superblocks_.rbegin();
+  //    if (last->pointer() + last->size() >= pointer) {
+  //      return last;
+  //    }
+  //    // no superblock can hold this size
+  //    return superblocks_.cend();
+  //  } else {
+  //    return it;
+  //  }
+  //}
 
   /**
    * @brief Get the first superblock that can fit a block of at least `size` bytes.

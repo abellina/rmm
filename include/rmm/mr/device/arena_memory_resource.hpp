@@ -145,7 +145,6 @@ class arena_memory_resource final : public device_memory_resource {
    */
   void* do_allocate(std::size_t bytes, cuda_stream_view stream) override
   {
-    rmm::scoped_range rng{"a:do_allocate"};
     if (bytes <= 0) { return nullptr; }
 #ifdef RMM_ARENA_USE_SIZE_CLASSES
     bytes = rmm::mr::detail::arena::align_to_size_class(bytes);
@@ -155,17 +154,14 @@ class arena_memory_resource final : public device_memory_resource {
     auto& arena = get_arena(stream);
 
     {
-    rmm::scoped_range rng{"a:do_allocate:step1"};
       //std::shared_lock lock(mtx_);
       void* pointer = arena.allocate(bytes);
       if (pointer != nullptr) { return pointer; }
     }
 
     {
-    rmm::scoped_range rng2{"a:do_allocate:step2:defrag"};
       std::unique_lock lock(mtx_);
       defragment();
-    rmm::scoped_range rng3{"a:do_allocate:step2:alloc"};
       void* pointer = arena.allocate(bytes);
       if (pointer == nullptr) {
         if (dump_log_on_failure_) { dump_memory_log(bytes); }
@@ -199,7 +195,6 @@ class arena_memory_resource final : public device_memory_resource {
    */
   void do_deallocate(void* ptr, std::size_t bytes, cuda_stream_view stream) override
   {
-    rmm::scoped_range rng{"a:do_deallocate"};
     if (ptr == nullptr || bytes <= 0) { return; }
 #ifdef RMM_ARENA_USE_SIZE_CLASSES
     bytes = rmm::mr::detail::arena::align_to_size_class(bytes);

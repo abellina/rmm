@@ -195,6 +195,7 @@ class block final : public byte_span {
    */
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
+    rmm::scoped_range rng{"block::fits"};
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(bytes > 0);
     return size() >= bytes;
@@ -354,6 +355,7 @@ class superblock final : public byte_span {
    */
   [[nodiscard]] bool fits(std::size_t bytes) const
   {
+    rmm::scoped_range rng{"superblock::fits"};
     RMM_LOGGING_ASSERT(is_valid());
     if (free_blocks_by_size_.empty()) {
       return false;

@@ -1071,7 +1071,7 @@ class arena {
   bool deallocate_from_superblock(block const& blk)
   {
     rmm::scoped_range rng{"arena deallocate_from_superblock"};
-    auto const iter = std::find_if(superblocks_.cbegin(),
+    auto const iter = std::find_if(find_begin_by_address(blk.pointer()),
                                    superblocks_.cend(),
                                    [&](auto const& sblk) { return sblk.contains(blk); });
     if (iter == superblocks_.cend()) { return false; }
@@ -1127,6 +1127,30 @@ class arena {
       superblock stester {it->pointer(), 0};
       // find the actual superblock
       return superblocks_.lower_bound(stester);
+    }
+  }
+
+  std::set<superblock>::const_iterator find_begin_by_address(void* address) const {
+    rmm::scoped_range rng{"arena::find_begin_by_address"};
+    if (superblocks_.empty()) {
+      return superblocks_.cend();
+    }
+    superblock tester {address, 0};
+    auto it = superblocks_.lower_bound(tester);
+    if (it == superblocks_.end()) {
+      auto last = superblocks_.rbegin();
+      if (last->pointer() + last->size() >= address) {
+        superblock stester {last->pointer(), 0};
+        return superblocks_.lower_bound(stester);
+      } else {
+        // no superblock can hold this address
+        return superblocks_.cend();
+      }
+    } else {
+      if (it != superblocks_.begin() && it->pointer() > address) { 
+        it--;
+      }
+      return it;
     }
   }
 

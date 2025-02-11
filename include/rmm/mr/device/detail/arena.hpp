@@ -360,7 +360,13 @@ class superblock final : public byte_span {
     if (free_blocks_by_size_.empty()) {
       return false;
     }
-    return size() >= bytes && free_blocks_by_size_.rbegin()->fits(bytes);
+    auto res = size() >= bytes && free_blocks_by_size_.rbegin()->fits(bytes);
+    if (res) {
+      rmm::scoped_range rng{"does fit"};
+    } else {
+      rmm::scoped_range rng{"does NOT fit"};
+    }
+    return res;
   }
 
   /**
@@ -792,6 +798,22 @@ class global_arena final {
       superblock stester {it->pointer(), 0};
       // find the actual superblock
       return superblocks_.lower_bound(stester);
+    }
+  }
+
+  std::set<superblock>::const_iterator find_begin_by_ptr(void* pointer) const {
+    rmm::scoped_range rng{"find_begin_by_pointer"};
+    superblock tester {pointer, 0};
+    auto it = superblocks_.lower_bound(tester);
+    if (it == superblocks_.end()) {
+      auto last = superblocks_.rbegin();
+      if (last->pointer() + last->size() >= pointer) {
+        return last;
+      }
+      // no superblock can hold this size
+      return superblocks_.cend();
+    } else {
+      return it;
     }
   }
 

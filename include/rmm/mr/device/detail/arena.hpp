@@ -810,13 +810,13 @@ class global_arena final {
     if (address < superblocks_.begin()->pointer()) {
       return e;
     }
-    if (address > e->pointer() + e->size()) {
+    auto last = superblocks_.rbegin(); 
+    if (address > last->pointer() + e->size()) {
       return e;
     }
     superblock tester {address, 0};
     auto it = superblocks_.lower_bound(tester);
     if (it == superblocks_.end()) {
-      auto last = superblocks_.rbegin(); 
       if (last->pointer() <= address && last->pointer() + last->size() >= address) {
         superblock stester {last->pointer(), 0};
         return superblocks_.lower_bound(stester);

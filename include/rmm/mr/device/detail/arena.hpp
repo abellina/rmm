@@ -803,8 +803,15 @@ class global_arena final {
 
   std::set<superblock>::const_iterator find_begin_by_address(void* address) const {
     rmm::scoped_range rng{"global_arena::find_begin_by_address"};
+    auto e = superblocks._cend();
     if (superblocks_.empty()) {
-      return superblocks_.cend();
+      return e;
+    }
+    if (address < superblocks_.begin()->pointer()) {
+      return e;
+    }
+    if (address > e->pointer() + e->size()) {
+      return e;
     }
     superblock tester {address, 0};
     auto it = superblocks_.lower_bound(tester);

@@ -412,7 +412,6 @@ class superblock final : public byte_span {
    */
   block first_fit(std::size_t size)
   {
-    NVTX3_FUNC_RANGE_IN(rmm::librmm_domain)
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(size > 0);
 
@@ -450,7 +449,6 @@ class superblock final : public byte_span {
    */
   void coalesce(block const& blk)  // NOLINT(readability-function-cognitive-complexity)
   {
-    NVTX3_FUNC_RANGE_IN(rmm::librmm_domain)
     RMM_LOGGING_ASSERT(is_valid());
     RMM_LOGGING_ASSERT(blk.is_valid());
     RMM_LOGGING_ASSERT(contains(blk));

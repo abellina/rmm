@@ -782,6 +782,8 @@ class global_arena final {
   }
 
   std::set<superblock>::const_iterator find_begin_by_address(void* address) const {
+    return superblocks_.cbegin();
+
     auto e = superblocks_.cend();
     if (superblocks_.empty()) {
       return e;
@@ -1135,6 +1137,7 @@ class arena {
   }
 
   std::set<superblock>::const_iterator find_begin_by_address(void* address) const {
+    return superblocks_.cbegin();
     if (superblocks_.empty()) {
       return superblocks_.cend();
     }

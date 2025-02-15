@@ -359,7 +359,7 @@ class arena_memory_resource final : public device_memory_resource {
   mutable std::shared_mutex mtx_;
 
 public:
-  std::pair<void*, std::size_t> get_upstream_allocation() = {
+  std::pair<void*, std::size_t> get_upstream_allocation() {
     return global_arena_.get_upstream_allocation();
   }
 

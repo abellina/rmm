@@ -488,7 +488,7 @@ class pool_memory_resource final
 
 public:
   std::pair<void*, std::size_t> get_upstream_allocation() {
-    return {root_pointer_, pool_size};
+    return std::pair(root_pointer_, pool_size);
   }
 
  private:

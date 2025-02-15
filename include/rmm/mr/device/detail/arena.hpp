@@ -790,7 +790,7 @@ class global_arena final {
       return e;
     }
     auto last = superblocks_.rbegin(); 
-    if (address > last->pointer() + e->size()) {
+    if (address > last->pointer() + last->size()) {
       return e;
     }
     superblock tester {address, 0};

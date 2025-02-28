@@ -65,6 +65,16 @@ class cuda_async_memory_resource final : public device_memory_resource {
     fabric    = 0x8   ///< Allows a fabric handle to be used for exporting. (cudaMemFabricHandle_t)
   };
 
+
+
+  enum class mem_location_type {
+    invalid = 0x0,
+    device = 0x1,
+    host = 0x2,
+    host_numa = 0x3,
+    host_numa_current = 0x4
+  };
+
   /**
    * @brief Constructs a cuda_async_memory_resource with the optionally specified initial pool size
    * and release threshold.
@@ -85,12 +95,14 @@ class cuda_async_memory_resource final : public device_memory_resource {
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   cuda_async_memory_resource(std::optional<std::size_t> initial_pool_size             = {},
                              std::optional<std::size_t> release_threshold             = {},
-                             std::optional<allocation_handle_type> export_handle_type = {})
+                             std::optional<allocation_handle_type> export_handle_type = {},
+                             std::optional<mem_location_type> location_type = {})
   {
     // Check if cudaMallocAsync Memory pool supported
     RMM_EXPECTS(rmm::detail::runtime_async_alloc::is_supported(),
                 "cudaMallocAsync not supported with this CUDA driver/runtime version");
 
+    auto is_gpu = (location_type.value_or(mem_location_type::device)) == mem_location_type::device;
     // Construct explicit pool
     cudaMemPoolProps pool_props{};
     pool_props.allocType   = cudaMemAllocationTypePinned;
@@ -99,8 +111,17 @@ class cuda_async_memory_resource final : public device_memory_resource {
     RMM_EXPECTS(
       rmm::detail::runtime_async_alloc::is_export_handle_type_supported(pool_props.handleTypes),
       "Requested IPC memory handle type not supported");
-    pool_props.location.type = cudaMemLocationTypeDevice;
-    pool_props.location.id   = rmm::get_current_cuda_device().value();
+    pool_props.location.type = static_cast<cudaMemLocationType>(location_type.value_or(mem_location_type::device));// cudaMemLocationTypeDevice;
+    if (is_gpu) {
+      pool_props.location.id   = rmm::get_current_cuda_device().value();
+    } else {
+      int cpu_numa_node_id;
+      auto gpu_id   = rmm::get_current_cuda_device().value();
+      RMM_CUDA_TRY(cudaDeviceGetAttribute(&cpu_numa_node_id, cudaDevAttrHostNumaId, gpu_id)); 
+      printf("numa_node_id %i\n", cpu_numa_node_id);
+      pool_props.location.id = cpu_numa_node_id;
+    }
+
     cudaMemPool_t cuda_pool_handle{};
     RMM_CUDA_TRY(cudaMemPoolCreate(&cuda_pool_handle, &pool_props));
     pool_ = cuda_async_view_memory_resource{cuda_pool_handle};

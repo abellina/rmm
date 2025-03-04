@@ -31,6 +31,8 @@
 #include <limits>
 #include <optional>
 
+#define CTK_DE_BASE_SUPPORT (CUDART_VERSION >= 12080)
+
 namespace RMM_NAMESPACE {
 namespace mr {
 /**
@@ -105,6 +107,9 @@ class cuda_async_memory_resource final : public device_memory_resource {
     auto is_gpu = (location_type.value_or(mem_location_type::device)) == mem_location_type::device;
     // Construct explicit pool
     cudaMemPoolProps pool_props{};
+    #if CTK_DE_BASE_SUPPORT
+    pool_props.usage = cudaMemPoolCreateUsageHwDecompress;
+    #endif
     pool_props.allocType   = cudaMemAllocationTypePinned;
     pool_props.handleTypes = static_cast<cudaMemAllocationHandleType>(
       export_handle_type.value_or(allocation_handle_type::none));

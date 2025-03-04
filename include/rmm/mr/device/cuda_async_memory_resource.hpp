@@ -108,6 +108,7 @@ class cuda_async_memory_resource final : public device_memory_resource {
     // Construct explicit pool
     cudaMemPoolProps pool_props{};
     #if CTK_DE_BASE_SUPPORT
+    printf("and setting the hw decompres props\n");
     pool_props.usage = cudaMemPoolCreateUsageHwDecompress;
     #endif
     pool_props.allocType   = cudaMemAllocationTypePinned;

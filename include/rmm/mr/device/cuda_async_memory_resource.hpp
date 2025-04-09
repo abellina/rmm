@@ -15,6 +15,7 @@
  */
 #pragma once
 
+#include <iostream>
 #include <rmm/cuda_device.hpp>
 #include <rmm/cuda_stream_view.hpp>
 #include <rmm/detail/error.hpp>
@@ -107,8 +108,8 @@ class cuda_async_memory_resource final : public device_memory_resource {
     auto is_gpu = (location_type.value_or(mem_location_type::device)) == mem_location_type::device;
     // Construct explicit pool
     cudaMemPoolProps pool_props{};
-    printf("NOT setting the hw decompres props\n");
-    //pool_props.usage = cudaMemPoolCreateUsageHwDecompress;
+    std::cout << "Setting the hw decompres props" << std::endl;
+    pool_props.usage = cudaMemPoolCreateUsageHwDecompress;
     pool_props.allocType   = cudaMemAllocationTypePinned;
     pool_props.handleTypes = static_cast<cudaMemAllocationHandleType>(
       export_handle_type.value_or(allocation_handle_type::none));
